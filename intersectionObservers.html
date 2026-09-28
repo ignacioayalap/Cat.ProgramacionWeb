@@ -1,0 +1,217 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IntersectionObserver - Cajas animadas</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+      color: #e0e0ff;
+    }
+
+    p.descripcion {
+      text-align: center;
+      color: #aaa;
+      margin-bottom: 60px;
+      font-size: 0.9rem;
+    }
+
+    /* --------------------------------------------------------
+       .caja: estado INICIAL → oculta y desplazada hacia abajo
+       Las cajas comienzan invisibles (opacity: 0) y
+       desplazadas 60px hacia abajo (translateY).
+       La transicion suaviza el cambio cuando se agrega .visible.
+    -------------------------------------------------------- */
+    .caja {
+      max-width: 500px;
+      margin: 0 auto 80px auto;  /* espacio para forzar scroll */
+      padding: 30px 24px;
+      border-radius: 12px;
+      border: 2px solid transparent;
+
+      /* Estado inicial: oculta y bajada */
+      opacity: 0;
+      transform: translateY(60px);
+
+      /* Transicion suave al aparecer */
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    /* --------------------------------------------------------
+       .visible: estado FINAL → visible y en su posicion normal
+       IntersectionObserver agrega esta clase cuando la caja
+       entra en el viewport.
+    -------------------------------------------------------- */
+    .caja.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Colores distintos para cada caja */
+    .caja:nth-child(1) { background: #16213e; border-color: #4fc3f7; }
+    .caja:nth-child(2) { background: #1b1b3a; border-color: #ab47bc; }
+    .caja:nth-child(3) { background: #0f3460; border-color: #26a69a; }
+    .caja:nth-child(4) { background: #1a1a2e; border-color: #ef5350; }
+    .caja:nth-child(5) { background: #1c2833; border-color: #ffa726; }
+    .caja:nth-child(6) { background: #1b2631; border-color: #66bb6a; }
+
+    .caja h2 {
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+
+    .caja p {
+      font-size: 0.9rem;
+      color: #ccc;
+      line-height: 1.5;
+    }
+
+    /* Indicador de scroll */
+    .scroll-hint {
+      text-align: center;
+      color: #777;
+      font-size: 0.85rem;
+      margin-bottom: 30px;
+      animation: bounce 1.5s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(6px); }
+    }
+
+    /* Log del observer */
+    #log {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #aaffaa;
+      max-width: 260px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    #log p { margin-bottom: 2px; }
+  </style>
+</head>
+<body>
+
+  <h1>IntersectionObserver</h1>
+  <p class="descripcion">Hacé scroll hacia abajo para ver las cajas aparecer</p>
+  <p class="scroll-hint">↓ Scroll ↓</p>
+
+  <!-- Cajas inicialmente ocultas -->
+  <div class="caja">
+    <h2>📦 Caja 1 — Introduccion</h2>
+    <p>IntersectionObserver detecta cuando este elemento entra en el viewport y le agrega la clase <code>.visible</code>.</p>
+  </div>
+
+  <div class="caja">
+    <h2>🎯 Caja 2 — Threshold</h2>
+    <p>El parametro <code>threshold: 0.2</code> indica que el callback se dispara cuando el 20% del elemento es visible.</p>
+  </div>
+
+  <div class="caja">
+    <h2>🔭 Caja 3 — Root</h2>
+    <p>El <code>root</code> es el elemento que actua como viewport. Si es <code>null</code>, se usa la ventana del navegador.</p>
+  </div>
+
+  <div class="caja">
+    <h2>📐 Caja 4 — rootMargin</h2>
+    <p><code>rootMargin: "0px 0px -50px 0px"</code> adelanta o retrasa el punto de disparo del observer.</p>
+  </div>
+
+  <div class="caja">
+    <h2>🔔 Caja 5 — Unobserve</h2>
+    <p>Una vez que la caja aparecio, llamamos a <code>observer.unobserve(entry.target)</code> para dejar de observarla.</p>
+  </div>
+
+  <div class="caja">
+    <h2>✅ Caja 6 — Fin del scroll</h2>
+    <p>Llegaste al final. El IntersectionObserver es muy util para lazy loading de imagenes y animaciones on-scroll.</p>
+  </div>
+
+  <!-- Log flotante del observer -->
+  <div id="log"><p style="color:#888">Esperando...</p></div>
+
+  <script>
+    // ============================================================
+    // IntersectionObserver
+    // ============================================================
+    // Observa cuando un elemento entra o sale del viewport.
+    //
+    // new IntersectionObserver(callback, opciones)
+    //   callback: funcion que recibe un array de IntersectionEntry
+    //   opciones:
+    //     root      → viewport de referencia (null = ventana)
+    //     rootMargin→ margen extra alrededor del root
+    //     threshold → que porcentaje del elemento debe ser visible
+    //                 para disparar el callback (0 = primer pixel,
+    //                 1 = 100% visible)
+    // ============================================================
+
+    const logEl = document.getElementById("log");
+    let logVacio = true;
+
+    function agregarLog(mensaje) {
+      if (logVacio) {
+        logEl.innerHTML = "";
+        logVacio = false;
+      }
+      const p = document.createElement("p");
+      p.textContent = mensaje;
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Seleccionar todas las cajas
+    const cajas = document.querySelectorAll(".caja");
+
+    // Crear el observer
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // entry.isIntersecting = true cuando el elemento entra al viewport
+          if (entry.isIntersecting) {
+            // Agregar clase .visible → dispara la animacion CSS
+            entry.target.classList.add("visible");
+
+            // Loguear cual caja aparecio
+            const indice = [...cajas].indexOf(entry.target) + 1;
+            agregarLog(`Caja ${indice} visible (${Math.round(entry.intersectionRatio * 100)}%)`);
+
+            // Dejar de observar esta caja (ya aparecio, no necesitamos seguirla)
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        root: null,          // usar la ventana del navegador como viewport
+        rootMargin: "0px",   // sin margen extra
+        threshold: 0.2,      // disparar cuando el 20% del elemento sea visible
+      }
+    );
+
+    // Registrar cada caja para ser observada
+    cajas.forEach((caja) => observer.observe(caja));
+  </script>
+</body>
+</html>
