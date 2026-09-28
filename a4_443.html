@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>To-Do List con MutationObserver</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f5f5;
+    }
+
+    h1 { font-size: 2rem; margin-bottom: 16px; }
+
+    /* --- Formulario de entrada --- */
+    #form-agregar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    #input-tarea {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid #aaa;
+      font-size: 0.95rem;
+    }
+
+    #btn-agregar {
+      padding: 6px 14px;
+      background: #e0e0e0;
+      border: 1px solid #aaa;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    #btn-agregar:hover { background: #ccc; }
+
+    /* --- Lista de tareas --- */
+    #lista-tareas {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 24px 0;
+      border: 1px solid #ccc;
+      background: white;
+    }
+
+    #lista-tareas li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid #ddd;
+      transition: background 0.2s;
+    }
+
+    #lista-tareas li:last-child { border-bottom: none; }
+
+    /* Estilo de tarea completada */
+    #lista-tareas li.completada {
+      background: #d4edda;
+      text-decoration: line-through;
+      color: #555;
+    }
+
+    .texto-tarea { flex: 1; }
+
+    .acciones { display: flex; gap: 4px; }
+
+    /* Botones de completar / eliminar */
+    .btn-completar,
+    .btn-eliminar {
+      width: 28px;
+      height: 28px;
+      border: 2px solid;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+    }
+
+    .btn-completar { border-color: green; color: green; }
+    .btn-completar:hover { background: #d4edda; }
+
+    .btn-eliminar  { border-color: red; color: red; }
+    .btn-eliminar:hover  { background: #fde; }
+
+    /* --- Registro del Observer --- */
+    h2 { font-size: 1.1rem; margin-bottom: 6px; }
+
+    #registro {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      min-height: 80px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>To-Do List</h1>
+
+  <!-- Formulario -->
+  <div id="form-agregar">
+    <input id="input-tarea" type="text" placeholder="Escribe una tarea..." />
+    <button id="btn-agregar">Agregar</button>
+  </div>
+
+  <!-- Lista de tareas -->
+  <ul id="lista-tareas"></ul>
+
+  <!-- Registro del MutationObserver -->
+  <h2>Registro de cambios en el DOM:</h2>
+  <div id="registro">Esperando cambios en el DOM...</div>
+
+  <script>
+    // ============================================================
+    // a4_443 - To-Do List con MutationObserver
+    // ============================================================
+    // MutationObserver es una API del navegador que "observa"
+    // cambios en el DOM y ejecuta un callback cuando ocurren.
+    // Tipos de cambios que puede detectar:
+    //   - childList: se agregan o eliminan nodos hijos
+    //   - attributes: cambian los atributos de un elemento
+    //   - characterData: cambia el texto de un nodo de texto
+    // ============================================================
+
+    const inputTarea  = document.getElementById("input-tarea");
+    const btnAgregar  = document.getElementById("btn-agregar");
+    const listaTareas = document.getElementById("lista-tareas");
+    const registro    = document.getElementById("registro");
+
+    // Limpiar el texto inicial del registro en el primer cambio
+    let primerCambio = true;
+
+    // ------------------------------------------------------------
+    // MUTATIONOBSERVER: observa cambios en la lista de tareas
+    // El callback recibe un array de MutationRecord con cada cambio.
+    // ------------------------------------------------------------
+    const observer = new MutationObserver((mutaciones) => {
+      if (primerCambio) {
+        registro.textContent = "";
+        primerCambio = false;
+      }
+
+      mutaciones.forEach((mutacion) => {
+        // mutacion.type: tipo de cambio ("childList" o "attributes")
+        // mutacion.target.nodeName: etiqueta del nodo afectado
+        const linea = `Cambio: ${mutacion.type} en ${mutacion.target.nodeName}\n`;
+        registro.textContent += linea;
+      });
+
+      // Auto-scroll al final del registro
+      registro.scrollTop = registro.scrollHeight;
+    });
+
+    // Iniciar la observacion sobre la lista
+    // subtree: true → observa tambien los descendientes
+    observer.observe(listaTareas, {
+      childList: true,    // detectar agregar / eliminar elementos
+      attributes: true,   // detectar cambios de clase (completada)
+      subtree: true,      // observar toda la subrama del DOM
+    });
+
+    // ------------------------------------------------------------
+    // FUNCION: crearItem(texto)
+    // Crea un <li> con el texto, boton completar y boton eliminar.
+    // ------------------------------------------------------------
+    function crearItem(texto) {
+      const li = document.createElement("li");
+
+      const spanTexto = document.createElement("span");
+      spanTexto.className = "texto-tarea";
+      spanTexto.textContent = texto;
+
+      // Boton completar (marca/desmarca la tarea)
+      const btnCompletar = document.createElement("button");
+      btnCompletar.className = "btn-completar";
+      btnCompletar.textContent = "✔";
+      btnCompletar.title = "Marcar como completada";
+      btnCompletar.addEventListener("click", () => {
+        // Agregar/quitar clase "completada" → el observer detecta el cambio de atributo
+        li.classList.toggle("completada");
+      });
+
+      // Boton eliminar
+      const btnEliminar = document.createElement("button");
+      btnEliminar.className = "btn-eliminar";
+      btnEliminar.textContent = "✖";
+      btnEliminar.title = "Eliminar tarea";
+      btnEliminar.addEventListener("click", () => {
+        li.remove(); // el observer detecta childList en la UL
+      });
+
+      const divAcciones = document.createElement("div");
+      divAcciones.className = "acciones";
+      divAcciones.appendChild(btnCompletar);
+      divAcciones.appendChild(btnEliminar);
+
+      li.appendChild(spanTexto);
+      li.appendChild(divAcciones);
+
+      return li;
+    }
+
+    // ------------------------------------------------------------
+    // EVENTO: click en el boton Agregar
+    // ------------------------------------------------------------
+    function agregarTarea() {
+      const texto = inputTarea.value.trim();
+      if (!texto) return;
+
+      const item = crearItem(texto);
+      listaTareas.appendChild(item); // el observer detecta childList en la UL
+
+      inputTarea.value = "";
+      inputTarea.focus();
+    }
+
+    btnAgregar.addEventListener("click", agregarTarea);
+
+    // Tambien agregar con Enter
+    inputTarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") agregarTarea();
+    });
+
+    // Cargar dos tareas de ejemplo al iniciar
+    listaTareas.appendChild(crearItem("Ir a la facultad"));
+    listaTareas.appendChild(crearItem("Hacer las compras"));
+  </script>
+</body>
+</html>
