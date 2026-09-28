@@ -1,0 +1,228 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PerformanceObserver</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f2f2f2; }
+    h1 { text-align: center; }
+    .botones { text-align: center; margin: 30px; }
+    button { padding: 12px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 6px; font-size: 16px; }
+    #btnLongTask { background: #e74c3c; color: white; }
+    #btnLayout   { background: #3498db; color: white; }
+    #btnRecurso  { background: #2ecc71; color: white; }
+    #panel { max-width: 900px; margin: auto; }
+    .metricas { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; }
+    .metrica { background: white; padding: 20px; border-radius: 8px; flex: 1; min-width: 150px; text-align: center; box-shadow: 0 2px 5px #ccc; }
+    .numero { font-size: 30px; font-weight: bold; }
+    #score  { font-size: 40px; font-weight: bold; }
+    #eventos { background: #1e1e1e; color: #00ff88; padding: 20px; border-radius: 8px; min-height: 200px; font-family: monospace; white-space: pre-wrap; }
+    #contenido { background: white; margin-top: 30px; padding: 20px; border-radius: 8px; }
+    .shift { padding: 30px; background: #ffd166; margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+<h1>Monitor de rendimiento</h1>
+
+<div class="botones">
+  <button id="btnLongTask">Ejecutar tarea pesada</button>
+  <button id="btnLayout">Generar Layout Shift</button>
+  <button id="btnRecurso">Cargar recurso lento</button>
+</div>
+
+<div id="panel">
+  <div class="metricas">
+    <div class="metrica">
+      <div>Long Tasks</div>
+      <div id="longTasks" class="numero">0</div>
+    </div>
+    <div class="metrica">
+      <div>Layout Shifts</div>
+      <div id="layoutShifts" class="numero">0</div>
+    </div>
+    <div class="metrica">
+      <div>Recursos lentos</div>
+      <div id="recursos" class="numero">0</div>
+    </div>
+    <div class="metrica">
+      <div>Performance Score</div>
+      <div id="score">100</div>
+    </div>
+  </div>
+
+  <h2>Eventos detectados</h2>
+  <div id="eventos">Esperando eventos...</div>
+
+  <div id="contenido">
+    <h2>Contenido de la pagina</h2>
+    <p>Este contenido se utilizara para provocar cambios de layout.</p>
+    <p>Presiona los botones para generar eventos de rendimiento.</p>
+  </div>
+</div>
+
+<script>
+  // =====================================================
+  // VARIABLES
+  // =====================================================
+  let cantidadLongTasks    = 0;
+  let cantidadLayoutShifts = 0;
+  let cantidadRecursos     = 0;
+  let score = 100;
+
+  const eventosEl = document.getElementById("eventos");
+  let primerEvento = true;
+
+  // =====================================================
+  // FUNCION PARA MOSTRAR EVENTOS
+  // =====================================================
+  function mostrarEvento(texto) {
+    if (primerEvento) { eventosEl.textContent = ""; primerEvento = false; }
+    eventosEl.textContent += texto + "\n\n";
+    eventosEl.scrollTop = eventosEl.scrollHeight;
+  }
+
+  // =====================================================
+  // ACTUALIZAR SCORE
+  // =====================================================
+  function actualizarScore() {
+    if (score < 0) score = 0;
+    document.getElementById("score").textContent = score;
+    // Cambiar color segun puntaje
+    const el = document.getElementById("score");
+    el.style.color = score >= 80 ? "#2ecc71" : score >= 50 ? "#f39c12" : "#e74c3c";
+  }
+
+  // =====================================================
+  // OBSERVAR LONG TASKS
+  // =====================================================
+  if (PerformanceObserver.supportedEntryTypes.includes("longtask")) {
+    const observerLongTask = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        cantidadLongTasks++;
+        document.getElementById("longTasks").textContent = cantidadLongTasks;
+
+        let descuento = 0;
+        if (entry.duration > 1000)      descuento = 20;
+        else if (entry.duration > 500)  descuento = 10;
+
+        score -= descuento;
+        actualizarScore();
+
+        mostrarEvento(
+          "[ LONG TASK ]\n" +
+          "Duracion: " + entry.duration.toFixed(2) + " ms\n" +
+          "Descuento: -" + descuento
+        );
+      });
+    });
+    observerLongTask.observe({ type: "longtask", buffered: true });
+  }
+
+  // =====================================================
+  // OBSERVAR LAYOUT SHIFT
+  // =====================================================
+  if (PerformanceObserver.supportedEntryTypes.includes("layout-shift")) {
+    const observerLayout = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        // Ignorar cambios provocados por interaccion del usuario
+        if (entry.hadRecentInput) return;
+
+        cantidadLayoutShifts++;
+        document.getElementById("layoutShifts").textContent = cantidadLayoutShifts;
+
+        let descuento = 0;
+        if (entry.value > 0.25) descuento = 15;
+
+        score -= descuento;
+        actualizarScore();
+
+        mostrarEvento(
+          "[ LAYOUT SHIFT ]\n" +
+          "Valor: " + entry.value.toFixed(4) + "\n" +
+          "Descuento: -" + descuento
+        );
+      });
+    });
+    observerLayout.observe({ type: "layout-shift", buffered: true });
+  }
+
+  // =====================================================
+  // OBSERVAR NAVEGACION
+  // =====================================================
+  if (PerformanceObserver.supportedEntryTypes.includes("navigation")) {
+    const observerNavigation = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        mostrarEvento(
+          "[ NAVIGATION ]\n" +
+          "DOM Content Loaded: " + entry.domContentLoadedEventEnd.toFixed(2) + " ms\n" +
+          "Load Event: "         + entry.loadEventEnd.toFixed(2) + " ms"
+        );
+      });
+    });
+    observerNavigation.observe({ type: "navigation", buffered: true });
+  }
+
+  // =====================================================
+  // OBSERVAR RECURSOS
+  // =====================================================
+  if (PerformanceObserver.supportedEntryTypes.includes("resource")) {
+    const observerResource = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        // Solo recursos que tarden mas de 1000 ms
+        if (entry.duration > 1000) {
+          cantidadRecursos++;
+          document.getElementById("recursos").textContent = cantidadRecursos;
+          score -= 5;
+          actualizarScore();
+          mostrarEvento(
+            "[ RECURSO LENTO ]\n" +
+            "Nombre: "   + entry.name + "\n" +
+            "Duracion: " + entry.duration.toFixed(2) + " ms\n" +
+            "Descuento: -5"
+          );
+        }
+      });
+    });
+    observerResource.observe({ type: "resource", buffered: true });
+  }
+
+  // =====================================================
+  // BOTON: Tarea pesada (bloquea el hilo principal ~1500ms)
+  // =====================================================
+  document.getElementById("btnLongTask").addEventListener("click", () => {
+    mostrarEvento("Ejecutando tarea pesada...");
+    const inicio = performance.now();
+    while (performance.now() - inicio < 1500) {
+      Math.sqrt(Math.random() * 100000);
+    }
+    mostrarEvento("Tarea pesada finalizada.");
+  });
+
+  // =====================================================
+  // BOTON: Generar Layout Shift (inserta contenido arriba)
+  // =====================================================
+  document.getElementById("btnLayout").addEventListener("click", () => {
+    const elemento = document.createElement("div");
+    elemento.className = "shift";
+    elemento.textContent = "Contenido insertado dinamicamente (provoca layout shift)";
+    document.getElementById("contenido").prepend(elemento);
+  });
+
+  // =====================================================
+  // BOTON: Cargar recurso lento (imagen pesada externa)
+  // URL corregida: era formato markdown, ahora es URL limpia
+  // =====================================================
+  document.getElementById("btnRecurso").addEventListener("click", () => {
+    const imagen = document.createElement("img");
+    imagen.src   = "https://picsum.photos/2000/1500"; // imagen de ~1-2 MB
+    imagen.width = 800;
+    imagen.style.display = "block";
+    imagen.style.marginTop = "10px";
+    document.getElementById("contenido").appendChild(imagen);
+    mostrarEvento("Recurso solicitado...");
+  });
+</script>
+</body>
+</html>
