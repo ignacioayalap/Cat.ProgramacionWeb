@@ -43,7 +43,7 @@ class Subject {
   // Cada observer debe ser una funcion que reciba el dato.
   // ----------------------------------------------------------
   notify(data) {
-    console.log(`\nNotificando a ${this._observers.length} observer(s) con: "${data}"`);
+    console.log(`\nNotificando a ${this._observers.length} observers con: "${data}"`);
     this._observers.forEach((observer) => observer(data));
   }
 

@@ -11,10 +11,10 @@
 // ============================================================
 
 const usuarios = [
-  { nombre: "ana garcia",   clave: "perro123"   },
-  { nombre: "LUIS PEREZ",   clave: "gato456"    },
-  { nombre: "marta lopez",  clave: "sol789"     },
-  { nombre: "PEDRO ROMERO", clave: "luna321"    },
+  { nombre: "ana garcia", clave: "perro123" },
+  { nombre: "LUIS PEREZ", clave: "gato456" },
+  { nombre: "marta lopez", clave: "sol789" },
+  { nombre: "PEDRO ROMERO", clave: "luna321" },
 ];
 
 // ------------------------------------------------------------
@@ -61,7 +61,7 @@ function encriptar(str) {
 function transformarUsuarios(arr, fnNombre, fnClave) {
   return arr.map((usuario) => ({
     nombre: fnNombre(usuario.nombre),
-    clave:  fnClave(usuario.clave),
+    clave: fnClave(usuario.clave),
   }));
 }
 
